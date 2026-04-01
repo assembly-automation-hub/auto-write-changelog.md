@@ -1,139 +1,42 @@
-import os
-import json
-import re
-import time
-from openai import OpenAI
-from github import Github, Auth
+name: AI Changelog Generator
 
-gh_token = os.environ.get("GITHUB_TOKEN")
-openai_api_key = os.environ.get("OPENAI_API_KEY")
-repo_name = os.environ.get("REPOSITORY")
-current_tag = os.environ.get("CURRENT_TAG") # Передаем тег из Actions
+on:
+  release:
+    types: [published]
 
-MODEL_NAME = "gpt-4o"
+permissions:
+  contents: write
 
-client = OpenAI(api_key=openai_api_key)
+jobs:
+  generate-changelog:
+    runs-on: ubuntu-latest
 
-auth = Auth.Token(gh_token)
-gh = Github(auth=auth)
-repo = gh.get_repo(repo_name)
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-# 1. Получаем список релизов, чтобы найти предыдущий
-releases = list(repo.get_releases())
-if len(releases) < 2:
-    print("Not enough releases to compare. Exiting.")
-    exit(0)
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-# releases[0] - это текущий релиз, который только что опубликовали
-# releases[1] - это предыдущий релиз
-previous_tag = releases[1].tag_name
+      - name: Install dependencies
+        run: pip install openai PyGithub
 
-print(f"Comparing releases: {previous_tag} -> {current_tag}")
+      - name: Run changelog generator
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REPOSITORY: ${{ github.repository }}
+          CURRENT_TAG: ${{ github.event.release.tag_name }}
+        run: python generate_changelog.py
 
-# 2. Получаем diff через PyGithub
-comparison = repo.compare(previous_tag, current_tag)
-
-diff_text = ""
-# Исключаем файлы, которые не нужны нейросети для анализа логики
-exclude_extensions = ('.lock', '-lock.json', '.svg', '.png', '.jpg', '.min.js')
-
-for file in comparison.files:
-    if file.filename.endswith(exclude_extensions):
-        continue
-    
-    # file.patch содержит сам diff. Если файла нет или он бинарный, пропускаем
-    if not file.patch:
-        continue
-        
-    diff_text += f"File: {file.filename}\nPatch:\n{file.patch}\n\n"
-    
-    # Ограничиваем размер контекста, чтобы не вылететь за лимиты токенов
-    if len(diff_text) > 80000:
-        diff_text += "\n[Diff truncated...]"
-        break
-
-if len(diff_text.strip()) < 50:
-    print("Diff too small or empty (only ignored files changed). Skipping.")
-    exit(0)
-
-# 3. Инструкции для промпта
-base_instructions = """
-Return only a raw JSON object with no markdown formatting. The JSON must have these exact keys:
-"added": list of strings (describe new features or logic added),
-"changed": list of strings (describe modifications to existing logic),
-"fixed": list of strings (describe bugs or issues resolved)
-
-If a category has no relevant changes based on the code diff, return an empty list for that key.
-Write clearly, concisely, and in English. Focus on the BUSINESS and LOGIC impact of the code changes.
-"""
-
-prompt = f"""Act as an Expert Software Engineer and Technical Writer.
-Analyze the following code changes between version {previous_tag} and {current_tag}.
-Translate these raw code changes into human-readable release notes.
-
-Changes:
-{diff_text}
-
-{base_instructions}"""
-
-# 4. Вызов модели (с твоей логикой ретраев)
-def call_model(prompt: str, retries: int = 3, delay: int = 5) -> dict:
-    for attempt in range(retries):
-        try:
-            response = client.chat.completions.create(
-                model=MODEL_NAME,
-                temperature=0.1,
-                # Используем response_format, чтобы гарантированно получить JSON от GPT-4o
-                response_format={ "type": "json_object" }, 
-                messages=[
-                    {"role": "system", "content": "You are a professional technical writer. Always return valid JSON only."},
-                    {"role": "user", "content": prompt}
-                ]
-            )
-            raw = response.choices[0].message.content.strip()
-            return json.loads(raw)
-        except Exception as e:
-            print(f"Attempt {attempt + 1} failed: {e}")
-            if attempt < retries - 1:
-                time.sleep(delay)
-
-    print("All attempts failed. Exiting gracefully.")
-    exit(1)
-
-result = call_model(prompt)
-
-# 5. Формируем Markdown из полученного JSON
-from datetime import datetime
-date_str = datetime.utcnow().strftime("%Y-%m-%d")
-
-changelog_entry = f"## [{current_tag}] - {date_str}\n"
-
-if result.get("added"):
-    changelog_entry += "### Added\n"
-    for item in result["added"]:
-        changelog_entry += f"- {item}\n"
-
-if result.get("changed"):
-    changelog_entry += "### Changed\n"
-    for item in result["changed"]:
-        changelog_entry += f"- {item}\n"
-
-if result.get("fixed"):
-    changelog_entry += "### Fixed\n"
-    for item in result["fixed"]:
-        changelog_entry += f"- {item}\n"
-
-changelog_entry += "\n"
-
-# 6. Обновляем файл локально
-filename = "Changelog.md"
-existing_content = ""
-
-if os.path.exists(filename):
-    with open(filename, "r", encoding="utf-8") as file:
-        existing_content = file.read()
-
-with open(filename, "w", encoding="utf-8") as file:
-    file.write(changelog_entry + existing_content)
-
-print("Changelog file updated locally.")
+      - name: Commit and push Changelog.md
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Changelog.md
+          git diff --staged --quiet || git commit -m "docs: auto-update Changelog.md for ${{ github.event.release.tag_name }}"
+          git push
