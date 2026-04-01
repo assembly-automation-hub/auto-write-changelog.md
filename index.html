@@ -10,16 +10,20 @@
         h1 { font-size: 20px; margin-top: 0; margin-bottom: 16px; border-bottom: 1px solid #d0d7de; padding-bottom: 8px; }
         label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 14px; }
         input[type="text"], input[type="password"] { width: 100%; padding: 5px 12px; font-size: 14px; line-height: 20px; color: #24292f; vertical-align: middle; background-color: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; box-sizing: border-box; margin-bottom: 16px; }
-        button { background-color: #2da44e; color: #fff; border: 1px solid rgba(27,31,36,0.15); border-radius: 6px; padding: 5px 16px; font-size: 14px; font-weight: 500; line-height: 20px; cursor: pointer; width: 100%; box-sizing: border-box; }
+        button { background-color: #2da44e; color: #fff; border: 1px solid rgba(27,31,36,0.15); border-radius: 6px; padding: 5px 16px; font-size: 14px; font-weight: 500; line-height: 20px; cursor: pointer; width: 100%; box-sizing: border-box; margin-bottom: 10px; }
         button:hover { background-color: #2c974b; }
         button:disabled { background-color: #94d3a2; cursor: not-allowed; }
+        .clear-btn { background-color: #e5534b; }
+        .clear-btn:hover { background-color: #c93c37; }
         #log { margin-top: 20px; padding: 10px; background: #0d1117; color: #c9d1d9; border-radius: 6px; font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; font-size: 12px; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
+        .warning { font-size: 12px; color: #57606a; margin-bottom: 16px; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>Генератор Changelog.md</h1>
+    <div class="warning">Ваши ключи сохраняются только локально в вашем браузере (localStorage).</div>
     
     <label for="ghToken">GitHub Token (с правами repo)</label>
     <input type="password" id="ghToken" placeholder="ghp_...">
@@ -31,6 +35,7 @@
     <input type="text" id="repoName" placeholder="например, Andrii/my-project">
     
     <button id="runBtn" onclick="runProcess()">Проверить и обновить Changelog</button>
+    <button id="clearBtn" class="clear-btn" onclick="clearCache()">Очистить сохраненные данные</button>
     
     <div id="log">Ожидание запуска...</div>
 </div>
@@ -39,18 +44,41 @@
     const logEl = document.getElementById('log');
     const runBtn = document.getElementById('runBtn');
 
+    // Восстановление данных при загрузке страницы
+    document.addEventListener('DOMContentLoaded', () => {
+        if (localStorage.getItem('ai_changelog_ghToken')) {
+            document.getElementById('ghToken').value = localStorage.getItem('ai_changelog_ghToken');
+        }
+        if (localStorage.getItem('ai_changelog_aiToken')) {
+            document.getElementById('aiToken').value = localStorage.getItem('ai_changelog_aiToken');
+        }
+        if (localStorage.getItem('ai_changelog_repoName')) {
+            document.getElementById('repoName').value = localStorage.getItem('ai_changelog_repoName');
+        }
+    });
+
     function log(message) {
         console.log(message);
         logEl.textContent += `\n> ${message}`;
         logEl.scrollTop = logEl.scrollHeight;
     }
 
-    // Безопасное кодирование и декодирование Base64 с поддержкой кириллицы (UTF-8)
+    function clearCache() {
+        localStorage.removeItem('ai_changelog_ghToken');
+        localStorage.removeItem('ai_changelog_aiToken');
+        localStorage.removeItem('ai_changelog_repoName');
+        document.getElementById('ghToken').value = '';
+        document.getElementById('aiToken').value = '';
+        document.getElementById('repoName').value = '';
+        log("Локальный кэш очищен.");
+    }
+
     function b64EncodeUnicode(str) {
         return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function toSolidBytes(match, p1) {
             return String.fromCharCode('0x' + p1);
         }));
     }
+    
     function b64DecodeUnicode(str) {
         return decodeURIComponent(atob(str).split('').map(function(c) {
             return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
@@ -83,8 +111,12 @@
             return;
         }
 
+        // Сохранение данных в localStorage
+        localStorage.setItem('ai_changelog_ghToken', ghToken);
+        localStorage.setItem('ai_changelog_aiToken', aiToken);
+        localStorage.setItem('ai_changelog_repoName', repoName);
+
         try {
-            // 1. Получаем релизы
             log("Получение списка релизов...");
             const releasesRes = await fetchGH(`${repoName}/releases`, ghToken);
             const releases = await releasesRes.json();
@@ -99,7 +131,6 @@
             const previousTag = releases[1].tag_name;
             log(`Сравниваем релизы: ${previousTag} -> ${currentTag}`);
 
-            // 2. Получаем Changelog.md
             log("Проверка файла Changelog.md...");
             let changelogContent = "";
             let changelogSha = null;
@@ -110,7 +141,6 @@
                 changelogContent = b64DecodeUnicode(fileData.content);
                 changelogSha = fileData.sha;
                 
-                // Проверяем, есть ли уже запись
                 if (changelogContent.includes(`## EN: Release Notes — Version ${currentTag}`) || 
                     changelogContent.includes(`## EN: Release Notes — Версия ${currentTag}`)) {
                     log(`Запись для версии ${currentTag} уже существует. Остановка.`);
@@ -121,7 +151,6 @@
                 log("Файл Changelog.md не найден. Будет создан новый.");
             }
 
-            // 3. Получаем Diff
             log("Загрузка изменений кода (diff)...");
             const compareRes = await fetchGH(`${repoName}/compare/${previousTag}...${currentTag}`, ghToken);
             const compareData = await compareRes.json();
@@ -148,7 +177,6 @@
                 return;
             }
 
-            // 4. Отправка в OpenAI
             log("Генерация описания через GPT-4o...");
             const promptContext = `Return only a raw JSON object with no markdown formatting. The JSON must have these exact keys:
 "en_improvements": list of strings (describe key improvements, new features, changed logic, or fixes in English),
@@ -180,7 +208,6 @@ ${diffText}`;
             const aiData = await aiRes.json();
             const resultObj = JSON.parse(aiData.choices[0].message.content.trim());
 
-            // 5. Формирование нового текста
             log("Сборка Markdown...");
             let newEntry = `## EN: Release Notes — Version ${currentTag}\n### Key Improvements:**\n`;
             
@@ -201,7 +228,6 @@ ${diffText}`;
             newEntry += `\n\n`;
             const finalContent = newEntry + changelogContent;
 
-            // 6. Пуш в репозиторий
             log("Отправка обновленного Changelog.md в GitHub...");
             const putBody = {
                 message: `docs: auto-update Changelog.md for release ${currentTag}`,
