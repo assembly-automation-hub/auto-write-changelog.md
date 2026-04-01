@@ -428,6 +428,9 @@
           <button type="button" class="provider-btn" data-provider="anthropic" onclick="selectProvider('anthropic')">
             <span class="provider-icon">◈</span> Claude
           </button>
+          <button type="button" class="provider-btn" data-provider="github" onclick="selectProvider('github')">
+            <span class="provider-icon">⬡</span> GH Models
+          </button>
         </div>
       </div>
       <div class="field">
@@ -489,9 +492,10 @@ const progBar   = document.getElementById('progressBar');
 // ── Provider config ───────────────────────────────────────────────────────────
 let currentProvider = 'openai';
 const PROVIDERS = {
-  openai:    { label: 'OpenAI API Key',    placeholder: 'sk-proj-...',              hint: 'GPT-4o · <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--accent)">platform.openai.com</a>' },
-  gemini:    { label: 'Gemini API Key',    placeholder: 'AIza...',                  hint: 'gemini-2.0-flash · <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--accent)">aistudio.google.com</a>' },
-  anthropic: { label: 'Anthropic API Key', placeholder: 'sk-ant-...',               hint: 'claude-3-5-haiku · <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--accent)">console.anthropic.com</a>' }
+  openai:    { label: 'OpenAI API Key',      placeholder: 'sk-proj-...',        hint: 'GPT-4o · <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--accent)">platform.openai.com</a>' },
+  gemini:    { label: 'Gemini API Key',      placeholder: 'AIza...',            hint: 'gemini-2.0-flash · <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--accent)">aistudio.google.com</a>' },
+  anthropic: { label: 'Anthropic API Key',   placeholder: 'sk-ant-...',         hint: 'claude-haiku-4-5 · <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--accent)">console.anthropic.com</a>' },
+  github:    { label: 'GitHub PAT (Models)', placeholder: 'github_pat_...',     hint: 'GPT-4o via GitHub Models · <a href="https://github.com/settings/tokens" target="_blank" style="color:var(--accent)">github.com/settings/tokens</a> — тот же токен что и выше' }
 };
 
 function selectProvider(p) {
@@ -668,6 +672,30 @@ ${diffText}`;
     const raw = d.content?.[0]?.text?.trim();
     if (!raw) throw new Error('Claude returned empty response');
     return JSON.parse(raw.replace(/^```json|```$/g, '').trim());
+  }
+
+  // ── GitHub Models (OpenAI-compatible endpoint) ──
+  if (provider === 'github') {
+    const r = await fetch('https://models.inference.ai.azure.com/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        temperature: 0.1,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user',   content: userPrompt }
+        ]
+      })
+    });
+    if (!r.ok) {
+      let m = `GitHub Models ${r.status}`;
+      try { const d = await r.json(); m += `: ${d.error?.message ?? JSON.stringify(d)}`; } catch {}
+      throw new Error(m);
+    }
+    const d = await r.json();
+    return JSON.parse(d.choices[0].message.content.trim());
   }
 
   throw new Error('Unknown provider: ' + provider);
