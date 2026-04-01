@@ -181,7 +181,38 @@
   input.valid { border-color: rgba(74,222,128,0.5); }
   input.error { border-color: rgba(255,106,155,0.5); }
 
-  .hint {
+  .provider-row {
+    display: flex;
+    gap: 8px;
+  }
+  .provider-btn {
+    flex: 1;
+    background: var(--bg);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .provider-btn:hover { border-color: var(--accent); color: var(--text); }
+  .provider-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(124,106,255,0.08);
+    box-shadow: 0 0 0 1px rgba(124,106,255,0.2);
+  }
+  .provider-icon { font-size: 13px; }
+
+
     font-size: 11px;
     color: var(--muted);
     margin-top: 5px;
@@ -386,8 +417,23 @@
         <p class="hint">Нужны права: <code>repo</code> (contents read/write)</p>
       </div>
       <div class="field">
-        <label>OpenAI API Key</label>
+        <label>AI Provider</label>
+        <div class="provider-row">
+          <button type="button" class="provider-btn active" data-provider="openai" onclick="selectProvider('openai')">
+            <span class="provider-icon">⬡</span> OpenAI
+          </button>
+          <button type="button" class="provider-btn" data-provider="gemini" onclick="selectProvider('gemini')">
+            <span class="provider-icon">✦</span> Gemini
+          </button>
+          <button type="button" class="provider-btn" data-provider="anthropic" onclick="selectProvider('anthropic')">
+            <span class="provider-icon">◈</span> Claude
+          </button>
+        </div>
+      </div>
+      <div class="field">
+        <label id="aiTokenLabel">OpenAI API Key</label>
         <input type="password" id="aiToken" placeholder="sk-proj-..." autocomplete="off">
+        <p class="hint" id="aiTokenHint">GPT-4o · <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--accent)">platform.openai.com</a></p>
       </div>
       <div class="field" style="margin-bottom:0">
         <label>Repository</label>
@@ -440,21 +486,45 @@ const statusEl  = document.getElementById('status');
 const progWrap  = document.getElementById('progressWrap');
 const progBar   = document.getElementById('progressBar');
 
-// ── Persist fields in sessionStorage (not localStorage — keys stay in-session only) ──
-const FIELDS = ['ghToken','aiToken','repoName'];
+// ── Provider config ───────────────────────────────────────────────────────────
+let currentProvider = 'openai';
+const PROVIDERS = {
+  openai:    { label: 'OpenAI API Key',    placeholder: 'sk-proj-...',              hint: 'GPT-4o · <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--accent)">platform.openai.com</a>' },
+  gemini:    { label: 'Gemini API Key',    placeholder: 'AIza...',                  hint: 'gemini-2.0-flash · <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--accent)">aistudio.google.com</a>' },
+  anthropic: { label: 'Anthropic API Key', placeholder: 'sk-ant-...',               hint: 'claude-3-5-haiku · <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--accent)">console.anthropic.com</a>' }
+};
+
+function selectProvider(p) {
+  currentProvider = p;
+  sessionStorage.setItem('clg_provider', p);
+  document.querySelectorAll('.provider-btn').forEach(b => b.classList.toggle('active', b.dataset.provider === p));
+  const cfg = PROVIDERS[p];
+  document.getElementById('aiTokenLabel').textContent = cfg.label;
+  document.getElementById('aiToken').placeholder = cfg.placeholder;
+  document.getElementById('aiTokenHint').innerHTML = cfg.hint;
+  document.getElementById('aiToken').value = sessionStorage.getItem('clg_aiToken_' + p) || '';
+}
+
+// ── Persist fields in sessionStorage ─────────────────────────────────────────
+const FIELDS = ['ghToken', 'repoName'];
 window.addEventListener('DOMContentLoaded', () => {
   FIELDS.forEach(id => {
     const v = sessionStorage.getItem('clg_' + id);
     if (v) document.getElementById(id).value = v;
   });
+  const savedProvider = sessionStorage.getItem('clg_provider') || 'openai';
+  selectProvider(savedProvider);
 });
 FIELDS.forEach(id => {
   document.getElementById(id).addEventListener('input', e => {
     sessionStorage.setItem('clg_' + id, e.target.value);
   });
 });
+document.getElementById('aiToken').addEventListener('input', e => {
+  sessionStorage.setItem('clg_aiToken_' + currentProvider, e.target.value);
+});
 
-// ── Logging ──────────────────────────────────────────────────────────────────
+// ── Logging ───────────────────────────────────────────────────────────────────
 function log(msg, type = 'info') {
   const icons = { info:'›', success:'✓', warn:'!', err:'✗' };
   const line = document.createElement('div');
@@ -466,20 +536,14 @@ function log(msg, type = 'info') {
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
-function clearLog() {
-  logEl.innerHTML = '';
-}
+function clearLog() { logEl.innerHTML = ''; }
 
-// ── Status ────────────────────────────────────────────────────────────────────
+// ── Status / Progress ─────────────────────────────────────────────────────────
 function setStatus(state, label) {
   statusEl.className = `status show ${state}`;
   statusEl.innerHTML = `<span class="status-dot"></span>${label}`;
 }
-
-// ── Progress ──────────────────────────────────────────────────────────────────
-let currentProgress = 0;
 function setProgress(pct) {
-  currentProgress = pct;
   progWrap.classList.toggle('active', pct > 0 && pct < 100);
   progBar.style.width = pct + '%';
 }
@@ -517,12 +581,106 @@ function b64Dec(str) {
   );
 }
 
+// ── AI call (multi-provider) ──────────────────────────────────────────────────
+async function callAI(provider, apiKey, previousTag, currentTag, diffText) {
+  const systemPrompt = 'You are a professional technical writer and translator. Return valid JSON only, no markdown, no backticks.';
+  const userPrompt =
+`Analyze the code diff below (changes between version ${previousTag} and ${currentTag}).
+Return ONLY a raw JSON object with these exact keys:
+"en_improvements": list of strings — key improvements, features, fixes (English, user-facing)
+"ru_improvements": list of strings — exact Russian translation of en_improvements
+
+Focus on business and user-facing impact. Be concise.
+
+Diff:
+${diffText}`;
+
+  // ── OpenAI ──
+  if (provider === 'openai') {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        temperature: 0.1,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user',   content: userPrompt }
+        ]
+      })
+    });
+    if (!r.ok) {
+      let m = `OpenAI ${r.status}`;
+      try { const d = await r.json(); m += `: ${d.error?.message}`; } catch {}
+      throw new Error(m);
+    }
+    const d = await r.json();
+    return JSON.parse(d.choices[0].message.content.trim());
+  }
+
+  // ── Google Gemini ──
+  if (provider === 'gemini') {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        generationConfig: { responseMimeType: 'application/json', temperature: 0.1 },
+        contents: [{ parts: [{ text: systemPrompt + '\n\n' + userPrompt }] }]
+      })
+    });
+    if (!r.ok) {
+      let m = `Gemini ${r.status}`;
+      try { const d = await r.json(); m += `: ${d.error?.message}`; } catch {}
+      throw new Error(m);
+    }
+    const d = await r.json();
+    const raw = d.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if (!raw) throw new Error('Gemini returned empty response');
+    return JSON.parse(raw.replace(/^```json|```$/g, '').trim());
+  }
+
+  // ── Anthropic Claude ──
+  if (provider === 'anthropic') {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        temperature: 0.1,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }]
+      })
+    });
+    if (!r.ok) {
+      let m = `Anthropic ${r.status}`;
+      try { const d = await r.json(); m += `: ${d.error?.message}`; } catch {}
+      throw new Error(m);
+    }
+    const d = await r.json();
+    const raw = d.content?.[0]?.text?.trim();
+    if (!raw) throw new Error('Claude returned empty response');
+    return JSON.parse(raw.replace(/^```json|```$/g, '').trim());
+  }
+
+  throw new Error('Unknown provider: ' + provider);
+}
+
 // ── Clear ─────────────────────────────────────────────────────────────────────
 function clearFields() {
-  FIELDS.forEach(id => {
+  ['ghToken','repoName'].forEach(id => {
     document.getElementById(id).value = '';
     sessionStorage.removeItem('clg_' + id);
   });
+  document.getElementById('aiToken').value = '';
+  Object.keys(PROVIDERS).forEach(p => sessionStorage.removeItem('clg_aiToken_' + p));
   clearLog();
   log('Fields cleared.', 'warn');
   setStatus('idle', 'Idle');
@@ -533,9 +691,9 @@ function clearFields() {
 async function runProcess() {
   clearLog();
 
-  const ghToken = document.getElementById('ghToken').value.trim();
-  const aiToken = document.getElementById('aiToken').value.trim();
-  const repoName = document.getElementById('repoName').value.trim().replace(/^github\.com\//i,'');
+  const ghToken  = document.getElementById('ghToken').value.trim();
+  const aiToken  = document.getElementById('aiToken').value.trim();
+  const repoName = document.getElementById('repoName').value.trim().replace(/^(https?:\/\/)?(www\.)?github\.com\//i, '');
 
   if (!ghToken || !aiToken || !repoName) {
     log('Fill in all fields before running.', 'err');
@@ -547,32 +705,26 @@ async function runProcess() {
   setProgress(5);
 
   try {
-    // ── Step 1: Get releases ──────────────────────────────────────────────
+    // Step 1 — releases
     log('Fetching releases…');
-    const relRes = await gh(`${repoName}/releases`, ghToken);
+    const relRes  = await gh(`${repoName}/releases`, ghToken);
     const releases = await relRes.json();
-
-    if (!Array.isArray(releases) || releases.length < 2) {
+    if (!Array.isArray(releases) || releases.length < 2)
       throw new Error(`Need at least 2 published releases. Found: ${releases.length ?? 0}`);
-    }
 
     const currentTag  = releases[0].tag_name;
     const previousTag = releases[1].tag_name;
-    log(`Latest release: ${currentTag}`, 'success');
-    log(`Previous release: ${previousTag}`);
+    log(`Latest: ${currentTag}  ←  Previous: ${previousTag}`, 'success');
     setProgress(20);
 
-    // ── Step 2: Check if already documented ──────────────────────────────
-    log('Checking existing Changelog.md…');
-    let existingContent = '';
-    let existingSha = null;
-
+    // Step 2 — check existing changelog
+    log('Checking Changelog.md…');
+    let existingContent = '', existingSha = null;
     const fileRes = await gh(`${repoName}/contents/Changelog.md`, ghToken);
     if (fileRes.status === 200) {
       const fd = await fileRes.json();
       existingContent = b64Dec(fd.content);
       existingSha = fd.sha;
-
       if (existingContent.includes(`Version ${currentTag}`) || existingContent.includes(`Версия ${currentTag}`)) {
         log(`Entry for ${currentTag} already exists. Nothing to do.`, 'warn');
         setStatus('done', 'Up to date');
@@ -580,88 +732,57 @@ async function runProcess() {
         runBtn.disabled = false;
         return;
       }
-      log('Changelog.md found — will prepend new entry.');
+      log('Existing Changelog.md found — will prepend.');
     } else {
       log('Changelog.md not found — will create new file.', 'warn');
     }
     setProgress(35);
 
-    // ── Step 3: Get diff ──────────────────────────────────────────────────
-    log(`Loading diff: ${previousTag}...${currentTag}…`);
+    // Step 3 — diff
+    log(`Loading diff ${previousTag}...${currentTag}…`);
     const cmpRes = await gh(`${repoName}/compare/${previousTag}...${currentTag}`, ghToken);
-    const cmp = await cmpRes.json();
+    const cmp    = await cmpRes.json();
 
-    const EXCLUDE = ['.lock','-lock.json','.svg','.png','.jpg','.jpeg','.gif','.ico','.min.js','.woff','.woff2'];
+    const EXCLUDE = ['.lock','-lock.json','.svg','.png','.jpg','.jpeg','.gif','.ico','.min.js','.woff','.woff2','.ttf','.eot'];
     let diffText = '';
+    let skipped  = 0;
 
     for (const f of (cmp.files || [])) {
-      if (EXCLUDE.some(ext => f.filename.endsWith(ext))) continue;
-      if (!f.patch) continue;
+      if (EXCLUDE.some(ext => f.filename.endsWith(ext))) { skipped++; continue; }
+
+      // Even if patch is missing, record the file status so AI knows what changed
+      if (!f.patch) {
+        diffText += `File: ${f.filename}  [${f.status}${f.additions ? ` +${f.additions}` : ''}${f.deletions ? ` -${f.deletions}` : ''}]\n\n`;
+        continue;
+      }
       diffText += `File: ${f.filename}\nPatch:\n${f.patch}\n\n`;
       if (diffText.length > 80_000) { diffText += '\n[Diff truncated...]'; break; }
     }
 
-    if (diffText.trim().length < 30) {
-      log('Diff is empty or too small (only binary/ignored files changed). Skipping.', 'warn');
+    const totalFiles = (cmp.files || []).length;
+    log(`${totalFiles} file(s) changed  •  ${skipped} binary/ignored skipped  •  ${Math.round(diffText.length / 1024)} KB diff`, 'success');
+
+    if (diffText.trim().length < 20) {
+      log('No meaningful diff found. Skipping.', 'warn');
       setStatus('done', 'No changes');
       setProgress(0);
       runBtn.disabled = false;
       return;
     }
-
-    log(`Diff loaded — ${Math.round(diffText.length / 1024)} KB of code changes.`, 'success');
     setProgress(50);
 
-    // ── Step 4: Call OpenAI ───────────────────────────────────────────────
-    log('Sending diff to GPT-4o…');
-
-    const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${aiToken}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        temperature: 0.1,
-        response_format: { type: 'json_object' },
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a professional technical writer and translator. Return valid JSON only, no markdown.'
-          },
-          {
-            role: 'user',
-            content: `Analyze the code diff below (changes between version ${previousTag} and ${currentTag}).
-Return ONLY a raw JSON object with these exact keys:
-"en_improvements": list of strings — key improvements, features, fixes (English, user-facing language)
-"ru_improvements": list of strings — exact Russian translation of en_improvements
-
-Focus on business and user-facing impact. Be concise.
-
-Diff:
-${diffText}`
-          }
-        ]
-      })
-    });
-
-    if (!aiRes.ok) {
-      let errMsg = `OpenAI API ${aiRes.status}`;
-      try { const d = await aiRes.json(); errMsg += `: ${d.error?.message}`; } catch {}
-      throw new Error(errMsg);
-    }
-
-    const aiData = await aiRes.json();
-    const result = JSON.parse(aiData.choices[0].message.content.trim());
-    log('GPT-4o response received.', 'success');
+    // Step 4 — AI
+    const providerLabel = PROVIDERS[currentProvider].label.replace(' API Key','');
+    log(`Sending diff to ${providerLabel}…`);
+    const result = await callAI(currentProvider, aiToken, previousTag, currentTag, diffText);
+    log(`${providerLabel} response received.`, 'success');
     setProgress(75);
 
-    // ── Step 5: Build Markdown ────────────────────────────────────────────
+    // Step 5 — build markdown
     const enItems = result.en_improvements || [];
     const ruItems = result.ru_improvements || [];
 
-    let entry = `## EN: Release Notes — Version ${currentTag}\n`;
+    let entry  = `## EN: Release Notes — Version ${currentTag}\n`;
     entry += `### Key Improvements:\n`;
     entry += enItems.length ? enItems.map(i => `- ${i}`).join('\n') : '- No significant changes.';
     entry += '\n\n---\n\n';
@@ -673,9 +794,8 @@ ${diffText}`
     const finalContent = entry + existingContent;
     setProgress(88);
 
-    // ── Step 6: Push to GitHub ────────────────────────────────────────────
+    // Step 6 — push
     log('Pushing Changelog.md to GitHub…');
-
     const putBody = {
       message: `docs: auto-update Changelog.md for ${currentTag}`,
       content: b64Enc(finalContent)
@@ -693,16 +813,16 @@ ${diffText}`
     });
 
     if (!putRes.ok) {
-      let errMsg = `GitHub write ${putRes.status}`;
-      try { const d = await putRes.json(); errMsg += `: ${d.message}`; } catch {}
-      throw new Error(errMsg);
+      let m = `GitHub write ${putRes.status}`;
+      try { const d = await putRes.json(); m += `: ${d.message}`; } catch {}
+      throw new Error(m);
     }
 
     setProgress(100);
-    log(`Changelog.md successfully updated for ${currentTag} 🎉`, 'success');
-    log(`EN items: ${enItems.length}  •  RU items: ${ruItems.length}`, 'success');
+    log(`Changelog.md updated for ${currentTag} 🎉`, 'success');
+    log(`${enItems.length} EN improvement(s)  •  ${ruItems.length} RU improvement(s)`, 'success');
     setStatus('done', 'Done');
-    setTimeout(() => setProgress(0), 1200);
+    setTimeout(() => setProgress(0), 1400);
 
   } catch (err) {
     log(`ERROR: ${err.message}`, 'err');
