@@ -1,264 +1,717 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Changelog Generator</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f6f8fa; color: #24292f; margin: 0; padding: 20px; display: flex; justify-content: center; }
-        .container { background: #fff; border: 1px solid #d0d7de; border-radius: 6px; padding: 24px; width: 100%; max-width: 600px; box-shadow: 0 3px 6px rgba(140,149,159,0.15); }
-        h1 { font-size: 20px; margin-top: 0; margin-bottom: 16px; border-bottom: 1px solid #d0d7de; padding-bottom: 8px; }
-        label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 14px; }
-        input[type="text"], input[type="password"] { width: 100%; padding: 5px 12px; font-size: 14px; line-height: 20px; color: #24292f; vertical-align: middle; background-color: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; box-sizing: border-box; margin-bottom: 16px; }
-        button { background-color: #2da44e; color: #fff; border: 1px solid rgba(27,31,36,0.15); border-radius: 6px; padding: 5px 16px; font-size: 14px; font-weight: 500; line-height: 20px; cursor: pointer; width: 100%; box-sizing: border-box; margin-bottom: 10px; }
-        button:hover { background-color: #2c974b; }
-        button:disabled { background-color: #94d3a2; cursor: not-allowed; }
-        .clear-btn { background-color: #e5534b; }
-        .clear-btn:hover { background-color: #c93c37; }
-        #log { margin-top: 20px; padding: 10px; background: #0d1117; color: #c9d1d9; border-radius: 6px; font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; font-size: 12px; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
-        .warning { font-size: 12px; color: #57606a; margin-bottom: 16px; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Changelog Generator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;600;800&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a25;
+    --border: #2a2a3a;
+    --accent: #7c6aff;
+    --accent2: #ff6a9b;
+    --green: #4ade80;
+    --yellow: #fbbf24;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 40px 20px 80px;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: -200px; left: -200px;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(124,106,255,0.08) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  body::after {
+    content: '';
+    position: fixed;
+    bottom: -200px; right: -200px;
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(255,106,155,0.06) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper {
+    width: 100%;
+    max-width: 680px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── Header ── */
+  header {
+    margin-bottom: 40px;
+    animation: fadeDown 0.6s ease both;
+  }
+  .badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid rgba(124,106,255,0.3);
+    padding: 3px 10px;
+    border-radius: 2px;
+    margin-bottom: 16px;
+  }
+  h1 {
+    font-family: var(--sans);
+    font-size: clamp(28px, 5vw, 42px);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    color: #fff;
+    margin-bottom: 10px;
+  }
+  h1 span { color: var(--accent); }
+  .subtitle {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+    max-width: 420px;
+  }
+
+  /* ── Card ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    animation: fadeUp 0.6s ease both;
+  }
+  .card + .card { margin-top: 16px; }
+  .card:nth-child(2) { animation-delay: 0.1s; }
+  .card:nth-child(3) { animation-delay: 0.2s; }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 20px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+  .card-header-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+  }
+  .card-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .card-body { padding: 20px; }
+
+  /* ── Fields ── */
+  .field { margin-bottom: 16px; }
+  .field:last-child { margin-bottom: 0; }
+
+  label {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 7px;
+  }
+
+  .input-wrap {
+    position: relative;
+  }
+  .input-wrap .prefix {
+    position: absolute;
+    left: 12px; top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    color: var(--muted);
+    pointer-events: none;
+    user-select: none;
+  }
+
+  input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  input.has-prefix { padding-left: 90px; }
+  input::placeholder { color: var(--muted); opacity: 0.6; }
+  input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(124,106,255,0.12);
+  }
+  input.valid { border-color: rgba(74,222,128,0.5); }
+  input.error { border-color: rgba(255,106,155,0.5); }
+
+  .hint {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 5px;
+    opacity: 0.8;
+  }
+
+  /* ── Buttons ── */
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  button {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    flex: 1;
+  }
+  .btn-primary::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 60%);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: #9b8dff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(124,106,255,0.4);
+  }
+  .btn-primary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 11px 16px;
+  }
+  .btn-ghost:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  /* ── Log ── */
+  .log-wrap {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .log-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+  .log-dots { display: flex; gap: 6px; }
+  .log-dots span {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+  }
+  .log-dots span:nth-child(1) { background: #ff5f57; }
+  .log-dots span:nth-child(2) { background: #febc2e; }
+  .log-dots span:nth-child(3) { background: #28c840; }
+  .log-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  #log {
+    padding: 16px;
+    font-size: 12px;
+    line-height: 1.7;
+    color: #a0a0b8;
+    min-height: 120px;
+    max-height: 280px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  #log::-webkit-scrollbar { width: 4px; }
+  #log::-webkit-scrollbar-track { background: transparent; }
+  #log::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .log-line { display: flex; gap: 8px; align-items: flex-start; }
+  .log-prefix { flex-shrink: 0; }
+  .log-info .log-prefix { color: var(--accent); }
+  .log-success .log-prefix { color: var(--green); }
+  .log-warn .log-prefix { color: var(--yellow); }
+  .log-err .log-prefix { color: var(--accent2); }
+  .log-err .log-text { color: var(--accent2); }
+  .log-success .log-text { color: var(--green); }
+
+  /* ── Progress bar ── */
+  .progress-wrap {
+    height: 2px;
+    background: var(--border);
+    overflow: hidden;
+    display: none;
+  }
+  .progress-wrap.active { display: block; }
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    width: 0%;
+    transition: width 0.4s ease;
+    box-shadow: 0 0 8px rgba(124,106,255,0.6);
+  }
+
+  /* ── Status badge ── */
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 2px;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .status.show { opacity: 1; }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .status.idle { color: var(--muted); border: 1px solid var(--border); }
+  .status.running { color: var(--accent); border: 1px solid rgba(124,106,255,0.3); }
+  .status.running .status-dot { background: var(--accent); animation: pulse 1s infinite; }
+  .status.done { color: var(--green); border: 1px solid rgba(74,222,128,0.3); }
+  .status.done .status-dot { background: var(--green); }
+  .status.failed { color: var(--accent2); border: 1px solid rgba(255,106,155,0.3); }
+  .status.failed .status-dot { background: var(--accent2); }
+
+  /* ── Animations ── */
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border: 2px solid rgba(124,106,255,0.3);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+</style>
 </head>
 <body>
+<div class="wrapper">
 
-<div class="container">
-    <h1>Генератор Changelog.md</h1>
-    <div class="warning">Ваши ключи сохраняются только локально в вашем браузере (localStorage).</div>
-    
-    <label for="ghToken">GitHub Token (с правами repo)</label>
-    <input type="password" id="ghToken" placeholder="ghp_...">
-    
-    <label for="aiToken">OpenAI API Key</label>
-    <input type="password" id="aiToken" placeholder="sk-...">
-    
-    <label for="repoName">Репозиторий (owner/repo)</label>
-    <input type="text" id="repoName" placeholder="например, Andrii/my-project">
-    
-    <button id="runBtn" onclick="runProcess()">Проверить и обновить Changelog</button>
-    <button id="clearBtn" class="clear-btn" onclick="clearCache()">Очистить сохраненные данные</button>
-    
-    <div id="log">Ожидание запуска...</div>
+  <header>
+    <div class="badge">⚡ AI-Powered</div>
+    <h1>Changelog<span>.</span>md<br>Generator</h1>
+    <p class="subtitle">Автоматически сравнивает два последних релиза и генерирует двуязычные release notes через GPT-4o.</p>
+  </header>
+
+  <!-- Credentials card -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-header-dot"></div>
+      <span class="card-title">Credentials</span>
+    </div>
+    <div class="card-body">
+      <div class="field">
+        <label>GitHub Token</label>
+        <input type="password" id="ghToken" placeholder="ghp_... или github_pat_..." autocomplete="off">
+        <p class="hint">Нужны права: <code>repo</code> (contents read/write)</p>
+      </div>
+      <div class="field">
+        <label>OpenAI API Key</label>
+        <input type="password" id="aiToken" placeholder="sk-proj-..." autocomplete="off">
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>Repository</label>
+        <div class="input-wrap">
+          <span class="prefix">github.com/</span>
+          <input type="text" id="repoName" class="has-prefix" placeholder="owner/repo-name" autocomplete="off">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Actions card -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-header-dot" style="background:var(--accent2);box-shadow:0 0 8px var(--accent2)"></div>
+      <span class="card-title">Actions</span>
+      <span class="status idle show" id="status">
+        <span class="status-dot" style="background:var(--muted)"></span>
+        Idle
+      </span>
+    </div>
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div class="card-body">
+      <div class="btn-row">
+        <button class="btn-primary" id="runBtn" onclick="runProcess()">▶ Run Generator</button>
+        <button class="btn-ghost" onclick="clearFields()" title="Очистить поля">✕ Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Log card -->
+  <div class="card">
+    <div class="card-header">
+      <div class="log-dots">
+        <span></span><span></span><span></span>
+      </div>
+      <span class="log-label">Console Output</span>
+    </div>
+    <div id="log">Waiting for input...<br></div>
+  </div>
+
 </div>
 
 <script>
-    const logEl = document.getElementById('log');
-    const runBtn = document.getElementById('runBtn');
+const logEl     = document.getElementById('log');
+const runBtn    = document.getElementById('runBtn');
+const statusEl  = document.getElementById('status');
+const progWrap  = document.getElementById('progressWrap');
+const progBar   = document.getElementById('progressBar');
 
-    // Восстановление данных при загрузке страницы
-    document.addEventListener('DOMContentLoaded', () => {
-        if (localStorage.getItem('ai_changelog_ghToken')) {
-            document.getElementById('ghToken').value = localStorage.getItem('ai_changelog_ghToken');
-        }
-        if (localStorage.getItem('ai_changelog_aiToken')) {
-            document.getElementById('aiToken').value = localStorage.getItem('ai_changelog_aiToken');
-        }
-        if (localStorage.getItem('ai_changelog_repoName')) {
-            document.getElementById('repoName').value = localStorage.getItem('ai_changelog_repoName');
-        }
+// ── Persist fields in sessionStorage (not localStorage — keys stay in-session only) ──
+const FIELDS = ['ghToken','aiToken','repoName'];
+window.addEventListener('DOMContentLoaded', () => {
+  FIELDS.forEach(id => {
+    const v = sessionStorage.getItem('clg_' + id);
+    if (v) document.getElementById(id).value = v;
+  });
+});
+FIELDS.forEach(id => {
+  document.getElementById(id).addEventListener('input', e => {
+    sessionStorage.setItem('clg_' + id, e.target.value);
+  });
+});
+
+// ── Logging ──────────────────────────────────────────────────────────────────
+function log(msg, type = 'info') {
+  const icons = { info:'›', success:'✓', warn:'!', err:'✗' };
+  const line = document.createElement('div');
+  line.className = `log-line log-${type}`;
+  line.innerHTML = `<span class="log-prefix">${icons[type]}</span><span class="log-text">${escHtml(msg)}</span>`;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function clearLog() {
+  logEl.innerHTML = '';
+}
+
+// ── Status ────────────────────────────────────────────────────────────────────
+function setStatus(state, label) {
+  statusEl.className = `status show ${state}`;
+  statusEl.innerHTML = `<span class="status-dot"></span>${label}`;
+}
+
+// ── Progress ──────────────────────────────────────────────────────────────────
+let currentProgress = 0;
+function setProgress(pct) {
+  currentProgress = pct;
+  progWrap.classList.toggle('active', pct > 0 && pct < 100);
+  progBar.style.width = pct + '%';
+}
+
+// ── GitHub helper ─────────────────────────────────────────────────────────────
+async function gh(path, token, opts = {}) {
+  const r = await fetch(`https://api.github.com/repos/${path}`, {
+    ...opts,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+      ...(opts.headers || {})
+    }
+  });
+  if (!r.ok && r.status !== 404) {
+    let msg = `GitHub API ${r.status}`;
+    try { const d = await r.json(); msg += `: ${d.message}`; } catch {}
+    throw new Error(msg);
+  }
+  return r;
+}
+
+// ── Base64 Unicode helpers ────────────────────────────────────────────────────
+function b64Enc(str) {
+  return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) =>
+    String.fromCharCode(parseInt(p1, 16))
+  ));
+}
+function b64Dec(str) {
+  return decodeURIComponent(
+    atob(str.replace(/\s/g,'')).split('').map(c =>
+      '%' + c.charCodeAt(0).toString(16).padStart(2,'0')
+    ).join('')
+  );
+}
+
+// ── Clear ─────────────────────────────────────────────────────────────────────
+function clearFields() {
+  FIELDS.forEach(id => {
+    document.getElementById(id).value = '';
+    sessionStorage.removeItem('clg_' + id);
+  });
+  clearLog();
+  log('Fields cleared.', 'warn');
+  setStatus('idle', 'Idle');
+  setProgress(0);
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+async function runProcess() {
+  clearLog();
+
+  const ghToken = document.getElementById('ghToken').value.trim();
+  const aiToken = document.getElementById('aiToken').value.trim();
+  const repoName = document.getElementById('repoName').value.trim().replace(/^github\.com\//i,'');
+
+  if (!ghToken || !aiToken || !repoName) {
+    log('Fill in all fields before running.', 'err');
+    return;
+  }
+
+  runBtn.disabled = true;
+  setStatus('running', '<span class="spinner"></span>Running');
+  setProgress(5);
+
+  try {
+    // ── Step 1: Get releases ──────────────────────────────────────────────
+    log('Fetching releases…');
+    const relRes = await gh(`${repoName}/releases`, ghToken);
+    const releases = await relRes.json();
+
+    if (!Array.isArray(releases) || releases.length < 2) {
+      throw new Error(`Need at least 2 published releases. Found: ${releases.length ?? 0}`);
+    }
+
+    const currentTag  = releases[0].tag_name;
+    const previousTag = releases[1].tag_name;
+    log(`Latest release: ${currentTag}`, 'success');
+    log(`Previous release: ${previousTag}`);
+    setProgress(20);
+
+    // ── Step 2: Check if already documented ──────────────────────────────
+    log('Checking existing Changelog.md…');
+    let existingContent = '';
+    let existingSha = null;
+
+    const fileRes = await gh(`${repoName}/contents/Changelog.md`, ghToken);
+    if (fileRes.status === 200) {
+      const fd = await fileRes.json();
+      existingContent = b64Dec(fd.content);
+      existingSha = fd.sha;
+
+      if (existingContent.includes(`Version ${currentTag}`) || existingContent.includes(`Версия ${currentTag}`)) {
+        log(`Entry for ${currentTag} already exists. Nothing to do.`, 'warn');
+        setStatus('done', 'Up to date');
+        setProgress(0);
+        runBtn.disabled = false;
+        return;
+      }
+      log('Changelog.md found — will prepend new entry.');
+    } else {
+      log('Changelog.md not found — will create new file.', 'warn');
+    }
+    setProgress(35);
+
+    // ── Step 3: Get diff ──────────────────────────────────────────────────
+    log(`Loading diff: ${previousTag}...${currentTag}…`);
+    const cmpRes = await gh(`${repoName}/compare/${previousTag}...${currentTag}`, ghToken);
+    const cmp = await cmpRes.json();
+
+    const EXCLUDE = ['.lock','-lock.json','.svg','.png','.jpg','.jpeg','.gif','.ico','.min.js','.woff','.woff2'];
+    let diffText = '';
+
+    for (const f of (cmp.files || [])) {
+      if (EXCLUDE.some(ext => f.filename.endsWith(ext))) continue;
+      if (!f.patch) continue;
+      diffText += `File: ${f.filename}\nPatch:\n${f.patch}\n\n`;
+      if (diffText.length > 80_000) { diffText += '\n[Diff truncated...]'; break; }
+    }
+
+    if (diffText.trim().length < 30) {
+      log('Diff is empty or too small (only binary/ignored files changed). Skipping.', 'warn');
+      setStatus('done', 'No changes');
+      setProgress(0);
+      runBtn.disabled = false;
+      return;
+    }
+
+    log(`Diff loaded — ${Math.round(diffText.length / 1024)} KB of code changes.`, 'success');
+    setProgress(50);
+
+    // ── Step 4: Call OpenAI ───────────────────────────────────────────────
+    log('Sending diff to GPT-4o…');
+
+    const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${aiToken}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        temperature: 0.1,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a professional technical writer and translator. Return valid JSON only, no markdown.'
+          },
+          {
+            role: 'user',
+            content: `Analyze the code diff below (changes between version ${previousTag} and ${currentTag}).
+Return ONLY a raw JSON object with these exact keys:
+"en_improvements": list of strings — key improvements, features, fixes (English, user-facing language)
+"ru_improvements": list of strings — exact Russian translation of en_improvements
+
+Focus on business and user-facing impact. Be concise.
+
+Diff:
+${diffText}`
+          }
+        ]
+      })
     });
 
-    function log(message) {
-        console.log(message);
-        logEl.textContent += `\n> ${message}`;
-        logEl.scrollTop = logEl.scrollHeight;
+    if (!aiRes.ok) {
+      let errMsg = `OpenAI API ${aiRes.status}`;
+      try { const d = await aiRes.json(); errMsg += `: ${d.error?.message}`; } catch {}
+      throw new Error(errMsg);
     }
 
-    function clearCache() {
-        localStorage.removeItem('ai_changelog_ghToken');
-        localStorage.removeItem('ai_changelog_aiToken');
-        localStorage.removeItem('ai_changelog_repoName');
-        document.getElementById('ghToken').value = '';
-        document.getElementById('aiToken').value = '';
-        document.getElementById('repoName').value = '';
-        log("Локальный кэш очищен.");
+    const aiData = await aiRes.json();
+    const result = JSON.parse(aiData.choices[0].message.content.trim());
+    log('GPT-4o response received.', 'success');
+    setProgress(75);
+
+    // ── Step 5: Build Markdown ────────────────────────────────────────────
+    const enItems = result.en_improvements || [];
+    const ruItems = result.ru_improvements || [];
+
+    let entry = `## EN: Release Notes — Version ${currentTag}\n`;
+    entry += `### Key Improvements:\n`;
+    entry += enItems.length ? enItems.map(i => `- ${i}`).join('\n') : '- No significant changes.';
+    entry += '\n\n---\n\n';
+    entry += `## RU: Release Notes — Версия ${currentTag}\n`;
+    entry += `### Основные улучшения:\n`;
+    entry += ruItems.length ? ruItems.map(i => `- ${i}`).join('\n') : '- Нет значительных изменений.';
+    entry += '\n\n---\n\n';
+
+    const finalContent = entry + existingContent;
+    setProgress(88);
+
+    // ── Step 6: Push to GitHub ────────────────────────────────────────────
+    log('Pushing Changelog.md to GitHub…');
+
+    const putBody = {
+      message: `docs: auto-update Changelog.md for ${currentTag}`,
+      content: b64Enc(finalContent)
+    };
+    if (existingSha) putBody.sha = existingSha;
+
+    const putRes = await fetch(`https://api.github.com/repos/${repoName}/contents/Changelog.md`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${ghToken}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(putBody)
+    });
+
+    if (!putRes.ok) {
+      let errMsg = `GitHub write ${putRes.status}`;
+      try { const d = await putRes.json(); errMsg += `: ${d.message}`; } catch {}
+      throw new Error(errMsg);
     }
 
-    function b64EncodeUnicode(str) {
-        return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function toSolidBytes(match, p1) {
-            return String.fromCharCode('0x' + p1);
-        }));
-    }
-    
-    function b64DecodeUnicode(str) {
-        return decodeURIComponent(atob(str).split('').map(function(c) {
-            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        }).join(''));
-    }
+    setProgress(100);
+    log(`Changelog.md successfully updated for ${currentTag} 🎉`, 'success');
+    log(`EN items: ${enItems.length}  •  RU items: ${ruItems.length}`, 'success');
+    setStatus('done', 'Done');
+    setTimeout(() => setProgress(0), 1200);
 
-    async function fetchGH(url, token, options = {}) {
-        const headers = {
-            'Authorization': `token ${token}`,
-            'Accept': 'application/vnd.github.v3+json'
-        };
-        const response = await fetch(`https://api.github.com/repos/${url}`, { ...options, headers });
-        if (!response.ok && response.status !== 404) {
-            throw new Error(`GitHub API Error: ${response.status} ${response.statusText}`);
-        }
-        return response;
-    }
-
-    async function runProcess() {
-        logEl.textContent = "Начало работы...";
-        runBtn.disabled = true;
-
-        const ghToken = document.getElementById('ghToken').value.trim();
-        const aiToken = document.getElementById('aiToken').value.trim();
-        const repoName = document.getElementById('repoName').value.trim();
-
-        if (!ghToken || !aiToken || !repoName) {
-            log("Ошибка: Заполните все поля.");
-            runBtn.disabled = false;
-            return;
-        }
-
-        // Сохранение данных в localStorage
-        localStorage.setItem('ai_changelog_ghToken', ghToken);
-        localStorage.setItem('ai_changelog_aiToken', aiToken);
-        localStorage.setItem('ai_changelog_repoName', repoName);
-
-        try {
-            log("Получение списка релизов...");
-            const releasesRes = await fetchGH(`${repoName}/releases`, ghToken);
-            const releases = await releasesRes.json();
-
-            if (releases.length < 2) {
-                log("Нужно как минимум 2 релиза для сравнения.");
-                runBtn.disabled = false;
-                return;
-            }
-
-            const currentTag = releases[0].tag_name;
-            const previousTag = releases[1].tag_name;
-            log(`Сравниваем релизы: ${previousTag} -> ${currentTag}`);
-
-            log("Проверка файла Changelog.md...");
-            let changelogContent = "";
-            let changelogSha = null;
-            
-            const fileRes = await fetchGH(`${repoName}/contents/Changelog.md`, ghToken);
-            if (fileRes.status === 200) {
-                const fileData = await fileRes.json();
-                changelogContent = b64DecodeUnicode(fileData.content);
-                changelogSha = fileData.sha;
-                
-                if (changelogContent.includes(`## EN: Release Notes — Version ${currentTag}`) || 
-                    changelogContent.includes(`## EN: Release Notes — Версия ${currentTag}`)) {
-                    log(`Запись для версии ${currentTag} уже существует. Остановка.`);
-                    runBtn.disabled = false;
-                    return;
-                }
-            } else {
-                log("Файл Changelog.md не найден. Будет создан новый.");
-            }
-
-            log("Загрузка изменений кода (diff)...");
-            const compareRes = await fetchGH(`${repoName}/compare/${previousTag}...${currentTag}`, ghToken);
-            const compareData = await compareRes.json();
-            
-            let diffText = "";
-            const excludeExt = ['.lock', '-lock.json', '.svg', '.png', '.jpg', '.min.js'];
-
-            if (compareData.files) {
-                for (const file of compareData.files) {
-                    if (excludeExt.some(ext => file.filename.endsWith(ext))) continue;
-                    if (!file.patch) continue;
-                    
-                    diffText += `File: ${file.filename}\nPatch:\n${file.patch}\n\n`;
-                    if (diffText.length > 80000) {
-                        diffText += "\n[Diff truncated...]";
-                        break;
-                    }
-                }
-            }
-
-            if (diffText.trim().length < 50) {
-                log("Изменения слишком малы или отсутствуют. Остановка.");
-                runBtn.disabled = false;
-                return;
-            }
-
-            log("Генерация описания через GPT-4o...");
-            const promptContext = `Return only a raw JSON object with no markdown formatting. The JSON must have these exact keys:
-"en_improvements": list of strings (describe key improvements, new features, changed logic, or fixes in English),
-"ru_improvements": list of strings (provide the exact Russian translation of the 'en_improvements' list)
-
-Write clearly, concisely, and focus on the BUSINESS and LOGIC impact of the code changes.
-
-Changes between ${previousTag} and ${currentTag}:
-${diffText}`;
-
-            const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${aiToken}`
-                },
-                body: JSON.stringify({
-                    model: "gpt-4o",
-                    temperature: 0.1,
-                    response_format: { type: "json_object" },
-                    messages: [
-                        { role: "system", content: "You are a professional technical writer and translator. Always return valid JSON only." },
-                        { role: "user", content: promptContext }
-                    ]
-                })
-            });
-
-            if (!aiRes.ok) throw new Error("Ошибка API OpenAI");
-            const aiData = await aiRes.json();
-            const resultObj = JSON.parse(aiData.choices[0].message.content.trim());
-
-            log("Сборка Markdown...");
-            let newEntry = `## EN: Release Notes — Version ${currentTag}\n### Key Improvements:**\n`;
-            
-            if (resultObj.en_improvements && resultObj.en_improvements.length > 0) {
-                resultObj.en_improvements.forEach(item => newEntry += `- ${item}\n`);
-            } else {
-                newEntry += `- No significant changes.\n`;
-            }
-
-            newEntry += `\n---\n\n## RU: Release Notes — Версия ${currentTag}\n### Основные улучшения:**\n`;
-            
-            if (resultObj.ru_improvements && resultObj.ru_improvements.length > 0) {
-                resultObj.ru_improvements.forEach(item => newEntry += `- ${item}\n`);
-            } else {
-                newEntry += `- Нет значительных изменений.\n`;
-            }
-
-            newEntry += `\n\n`;
-            const finalContent = newEntry + changelogContent;
-
-            log("Отправка обновленного Changelog.md в GitHub...");
-            const putBody = {
-                message: `docs: auto-update Changelog.md for release ${currentTag}`,
-                content: b64EncodeUnicode(finalContent)
-            };
-            if (changelogSha) {
-                putBody.sha = changelogSha;
-            }
-
-            const putRes = await fetch(`https://api.github.com/repos/${repoName}/contents/Changelog.md`, {
-                method: "PUT",
-                headers: {
-                    'Authorization': `token ${ghToken}`,
-                    'Accept': 'application/vnd.github.v3+json',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(putBody)
-            });
-
-            if (putRes.ok) {
-                log("Успех! Changelog.md обновлен.");
-            } else {
-                throw new Error("Не удалось обновить файл в репозитории.");
-            }
-
-        } catch (error) {
-            log(`КРИТИЧЕСКАЯ ОШИБКА: ${error.message}`);
-        } finally {
-            runBtn.disabled = false;
-        }
-    }
+  } catch (err) {
+    log(`ERROR: ${err.message}`, 'err');
+    setStatus('failed', 'Failed');
+    setProgress(0);
+  } finally {
+    runBtn.disabled = false;
+  }
+}
 </script>
 </body>
 </html>
