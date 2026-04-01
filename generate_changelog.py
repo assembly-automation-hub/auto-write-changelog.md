@@ -4,10 +4,23 @@ import time
 from openai import OpenAI
 from github import Github, Auth
 
-gh_token = os.environ.get("GITHUB_TOKEN")
+# 1. Получаем ключи из переменных окружения
+# Для GitHub теперь ожидается переменная GH_PAT, куда ты передашь свой github_pat_...
+gh_token = os.environ.get("GH_PAT")
+# Для OpenAI ожидается переменная OPENAI_API_KEY, куда ты передашь sk-proj-...
 openai_api_key = os.environ.get("OPENAI_API_KEY")
+
 repo_name = os.environ.get("REPOSITORY")
 current_tag = os.environ.get("CURRENT_TAG")
+
+# Проверки на наличие ключей
+if not gh_token:
+    print("КРИТИЧЕСКАЯ ОШИБКА: Не найден токен GitHub (GH_PAT).")
+    exit(1)
+
+if not openai_api_key:
+    print("КРИТИЧЕСКАЯ ОШИБКА: Не найден токен OpenAI (OPENAI_API_KEY).")
+    exit(1)
 
 MODEL_NAME = "gpt-4o"
 client = OpenAI(api_key=openai_api_key)
@@ -16,7 +29,7 @@ auth = Auth.Token(gh_token)
 gh = Github(auth=auth)
 repo = gh.get_repo(repo_name)
 
-# 1. Получаем список релизов
+# 2. Получаем список релизов
 releases = list(repo.get_releases())
 if len(releases) < 2:
     print("Not enough releases to compare. Exiting.")
@@ -25,7 +38,7 @@ if len(releases) < 2:
 previous_tag = releases[1].tag_name
 print(f"Comparing releases: {previous_tag} -> {current_tag}")
 
-# 2. Получаем diff
+# 3. Получаем diff
 comparison = repo.compare(previous_tag, current_tag)
 diff_text = ""
 exclude_extensions = ('.lock', '-lock.json', '.svg', '.png', '.jpg', '.min.js')
@@ -45,7 +58,7 @@ if len(diff_text.strip()) < 50:
     print("Diff too small or empty. Skipping.")
     exit(0)
 
-# 3. Инструкции для промпта (Адаптировано под 2 языка)
+# 4. Инструкции для промпта (Адаптировано под 2 языка)
 base_instructions = """
 Return only a raw JSON object with no markdown formatting. The JSON must have these exact keys:
 "en_improvements": list of strings (describe key improvements, new features, changed logic, or fixes in English),
@@ -63,7 +76,7 @@ Changes:
 
 {base_instructions}"""
 
-# 4. Вызов модели
+# 5. Вызов модели OpenAI
 def call_model(prompt: str, retries: int = 3, delay: int = 5) -> dict:
     for attempt in range(retries):
         try:
@@ -88,9 +101,9 @@ def call_model(prompt: str, retries: int = 3, delay: int = 5) -> dict:
 
 result = call_model(prompt)
 
-# 5. Формируем Markdown строго по шаблону
+# 6. Формируем Markdown строго по шаблону
 changelog_entry = f"## EN: Release Notes — Version {current_tag}\n"
-changelog_entry += "### Key Improvements:**\n"
+changelog_entry += "### Key Improvements:\n"
 
 if result.get("en_improvements"):
     for item in result["en_improvements"]:
@@ -101,7 +114,7 @@ else:
 changelog_entry += "\n---\n\n"
 
 changelog_entry += f"## RU: Release Notes — Версия {current_tag}\n"
-changelog_entry += "### Основные улучшения:**\n"
+changelog_entry += "### Основные улучшения:\n"
 
 if result.get("ru_improvements"):
     for item in result["ru_improvements"]:
@@ -111,7 +124,7 @@ else:
 
 changelog_entry += "\n\n"
 
-# 6. Обновляем файл локально
+# 7. Обновляем файл локально
 filename = "Changelog.md"
 existing_content = ""
 
